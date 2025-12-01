@@ -22,10 +22,11 @@ import {
   Edit as EditIcon,
   ToggleOn as ToggleOnIcon,
   ToggleOff as ToggleOffIcon,
+  CloudUpload as CloudUploadIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import type { Partner } from '../types/Partner';
-import { getPartners, togglePartnerActive } from '../services/partners';
+import { getPartners, togglePartnerActive, seedPartnersData } from '../services/partners';
 import { useAuth } from '../context/AuthContext';
 import PartnerFormModal from '../components/PartnerFormModal';
 
@@ -39,6 +40,7 @@ const PartnersPage: React.FC = () => {
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   // Ortakları yükle
   const loadPartners = React.useCallback(async () => {
@@ -60,6 +62,34 @@ const PartnersPage: React.FC = () => {
   useEffect(() => {
     loadPartners();
   }, [loadPartners]);
+
+  // Örnek verileri yükle
+  const handleSeedData = async () => {
+    if (!window.confirm('Excel\'deki örnek veriler (3 ortak + 6 dönem) eklenecek. Devam etmek istiyor musunuz?')) {
+      return;
+    }
+    
+    try {
+      setSeeding(true);
+      setError(null);
+      
+      await seedPartnersData(
+        currentUserAuth ? {
+          uid: currentUserAuth.uid,
+          email: currentUserAuth.email || '',
+          displayName: currentUserAuth.displayName || '',
+        } : undefined
+      );
+      
+      loadPartners();
+      alert('✅ Örnek veriler başarıyla eklendi!');
+    } catch (err) {
+      console.error('Örnek veriler eklenirken hata:', err);
+      setError('Örnek veriler eklenirken bir hata oluştu.');
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   // Ortak durumunu değiştir (aktif/pasif)
   const handleToggleActive = async (partner: Partner) => {
@@ -92,11 +122,11 @@ const PartnersPage: React.FC = () => {
   // Bakiye açıklaması
   const getBalanceDescription = (balance: number): { text: string; color: string } => {
     if (balance > 0) {
-      return { text: 'Şirket ortağa borçlu', color: 'success.main' };
+      return { text: 'Fazla alınan (ortak şirkete borçlu)', color: 'warning.main' };
     } else if (balance < 0) {
-      return { text: 'Ortak şirkete borçlu', color: 'error.main' };
+      return { text: 'Eksik alınan (şirket ortağa borçlu)', color: 'success.main' };
     }
-    return { text: 'Bakiye sıfır', color: 'text.secondary' };
+    return { text: 'Bakiye dengede', color: 'text.secondary' };
   };
 
   if (loading) {
@@ -115,6 +145,18 @@ const PartnersPage: React.FC = () => {
           Ortaklar
         </Typography>
         <Box display="flex" gap={2}>
+          {/* Örnek veri yükle butonu - sadece veri yoksa göster */}
+          {partners.length === 0 && (
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={handleSeedData}
+              startIcon={<CloudUploadIcon />}
+              disabled={seeding}
+            >
+              {seeding ? 'Yükleniyor...' : 'Örnek Veri Yükle'}
+            </Button>
+          )}
           <Button
             variant="outlined"
             onClick={() => setShowInactive(!showInactive)}
@@ -196,7 +238,7 @@ const PartnersPage: React.FC = () => {
                           fontWeight="bold" 
                           sx={{ color: balanceInfo.color }}
                         >
-                          {formatCurrency(Math.abs(partner.currentBalance))}
+                          {formatCurrency(partner.currentBalance)}
                         </Typography>
                         <Typography variant="caption" sx={{ color: balanceInfo.color }}>
                           {balanceInfo.text}

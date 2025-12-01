@@ -29,6 +29,8 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Lock as LockIcon,
+  LockOpen as LockOpenIcon,
+  History as HistoryIcon,
   ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -39,14 +41,16 @@ import {
   getPartnerStatements,
   deletePartnerStatement,
   closePartnerStatement,
+  reopenPartnerStatement,
 } from '../services/partners';
 import { useAuth } from '../context/AuthContext';
 import PartnerStatementFormModal from '../components/PartnerStatementFormModal';
+import PartnerStatementHistoryModal from '../components/PartnerStatementHistoryModal';
 
 const PartnerDetailPage: React.FC = () => {
   const { partnerId } = useParams<{ partnerId: string }>();
   const navigate = useNavigate();
-  const { currentUserAuth, currentUserProfile } = useAuth();
+  const { currentUserAuth } = useAuth();
 
   const [partner, setPartner] = useState<Partner | null>(null);
   const [statements, setStatements] = useState<PartnerStatement[]>([]);
@@ -56,6 +60,8 @@ const PartnerDetailPage: React.FC = () => {
   const [editingStatement, setEditingStatement] = useState<PartnerStatement | null>(null);
   const [confirmClose, setConfirmClose] = useState<PartnerStatement | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<PartnerStatement | null>(null);
+  const [confirmReopen, setConfirmReopen] = useState<PartnerStatement | null>(null);
+  const [historyStatement, setHistoryStatement] = useState<PartnerStatement | null>(null);
 
   // Verileri yükle
   const loadData = React.useCallback(async () => {
@@ -101,11 +107,11 @@ const PartnerDetailPage: React.FC = () => {
   // Bakiye açıklaması
   const getBalanceDescription = (balance: number): { text: string; color: string } => {
     if (balance > 0) {
-      return { text: 'Şirket ortağa borçlu', color: 'success.main' };
+      return { text: 'Fazla alınan (ortak şirkete borçlu)', color: 'warning.main' };
     } else if (balance < 0) {
-      return { text: 'Ortak şirkete borçlu', color: 'error.main' };
+      return { text: 'Eksik alınan (şirket ortağa borçlu)', color: 'success.main' };
     }
-    return { text: 'Bakiye sıfır', color: 'text.secondary' };
+    return { text: 'Bakiye dengede', color: 'text.secondary' };
   };
 
   // Dönem formatla
@@ -131,6 +137,27 @@ const PartnerDetailPage: React.FC = () => {
     } catch (err) {
       console.error('Dönem kapatılırken hata:', err);
       setError('Dönem kapatılırken bir hata oluştu.');
+    }
+  };
+
+  // Dönemi yeniden aç
+  const handleReopenStatement = async () => {
+    if (!confirmReopen) return;
+
+    try {
+      await reopenPartnerStatement(
+        confirmReopen.id,
+        currentUserAuth ? {
+          uid: currentUserAuth.uid,
+          email: currentUserAuth.email || '',
+          displayName: currentUserAuth.displayName || '',
+        } : undefined
+      );
+      setConfirmReopen(null);
+      loadData();
+    } catch (err) {
+      console.error('Dönem açılırken hata:', err);
+      setError('Dönem açılırken bir hata oluştu.');
     }
   };
 
@@ -224,7 +251,7 @@ const PartnerDetailPage: React.FC = () => {
                 Güncel Bakiye
               </Typography>
               <Typography variant="h5" fontWeight="bold" sx={{ color: balanceInfo.color }}>
-                {formatCurrency(Math.abs(partner.currentBalance))}
+                {formatCurrency(partner.currentBalance)}
               </Typography>
               <Typography variant="caption" sx={{ color: balanceInfo.color }}>
                 {balanceInfo.text}
@@ -253,18 +280,16 @@ const PartnerDetailPage: React.FC = () => {
         <Typography variant="h5" fontWeight="bold">
           Aylık Hesap Dönemleri
         </Typography>
-        {currentUserProfile?.role === 'ADMIN' && (
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => {
-              setEditingStatement(null);
-              setShowFormModal(true);
-            }}
-          >
-            Yeni Dönem Satırı Ekle
-          </Button>
-        )}
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => {
+            setEditingStatement(null);
+            setShowFormModal(true);
+          }}
+        >
+          Yeni Dönem Satırı Ekle
+        </Button>
       </Box>
 
       {/* Statement Tablosu */}
@@ -307,7 +332,7 @@ const PartnerDetailPage: React.FC = () => {
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography sx={{ color: statement.previousBalance >= 0 ? 'success.main' : 'error.main' }}>
+                    <Typography sx={{ color: statement.previousBalance >= 0 ? 'warning.main' : 'success.main' }}>
                       {formatCurrency(statement.previousBalance)}
                     </Typography>
                   </TableCell>
@@ -326,7 +351,7 @@ const PartnerDetailPage: React.FC = () => {
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography fontWeight="bold" sx={{ color: statement.nextMonthBalance >= 0 ? 'success.main' : 'error.main' }}>
+                    <Typography fontWeight="bold" sx={{ color: statement.nextMonthBalance >= 0 ? 'warning.main' : 'success.main' }}>
                       {formatCurrency(statement.nextMonthBalance)}
                     </Typography>
                   </TableCell>
@@ -340,20 +365,29 @@ const PartnerDetailPage: React.FC = () => {
                   </TableCell>
                   <TableCell align="center">
                     <Box display="flex" justifyContent="center" gap={0.5}>
-                      {statement.status === 'DRAFT' && currentUserProfile?.role === 'ADMIN' && (
+                      <Tooltip title="Düzenle">
+                        <IconButton
+                          size="small"
+                          color="info"
+                          onClick={() => {
+                            setEditingStatement(statement);
+                            setShowFormModal(true);
+                          }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Geçmiş">
+                        <IconButton
+                          size="small"
+                          color="default"
+                          onClick={() => setHistoryStatement(statement)}
+                        >
+                          <HistoryIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      {statement.status === 'DRAFT' && (
                         <>
-                          <Tooltip title="Düzenle">
-                            <IconButton
-                              size="small"
-                              color="info"
-                              onClick={() => {
-                                setEditingStatement(statement);
-                                setShowFormModal(true);
-                              }}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
                           <Tooltip title="Dönemi Kapat">
                             <IconButton
                               size="small"
@@ -375,9 +409,15 @@ const PartnerDetailPage: React.FC = () => {
                         </>
                       )}
                       {statement.status === 'CLOSED' && (
-                        <Typography variant="caption" color="text.secondary">
-                          Salt okunur
-                        </Typography>
+                        <Tooltip title="Yeniden Aç">
+                          <IconButton
+                            size="small"
+                            color="warning"
+                            onClick={() => setConfirmReopen(statement)}
+                          >
+                            <LockOpenIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </Box>
                   </TableCell>
@@ -389,12 +429,12 @@ const PartnerDetailPage: React.FC = () => {
       </TableContainer>
 
       {/* Formül Açıklaması */}
-      <Paper sx={{ p: 2, mt: 3, backgroundColor: 'grey.50' }}>
+      <Paper sx={{ p: 2, mt: 3, bgcolor: 'background.paper', border: 1, borderColor: 'divider' }}>
         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
           Hesaplama Formülü:
         </Typography>
-        <Typography variant="body2" fontFamily="monospace">
-          Sonraki Aya Devreden = Devreden Bakiye + Kişisel Harc. İadesi + Maaş + Kar Payı - Bu Ay Çekilen
+        <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.primary' }}>
+          Sonraki Aya Devreden = Devreden Bakiye + Bu Ay Çekilen - (Kişisel Harc. İadesi + Maaş + Kar Payı)
         </Typography>
       </Paper>
 
@@ -437,6 +477,26 @@ const PartnerDetailPage: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Yeniden Açma Onay Dialogu */}
+      <Dialog open={!!confirmReopen} onClose={() => setConfirmReopen(null)}>
+        <DialogTitle>Dönemi Yeniden Aç</DialogTitle>
+        <DialogContent>
+          <Typography>
+            <strong>{confirmReopen && formatPeriod(confirmReopen.month, confirmReopen.year)}</strong> dönemini 
+            yeniden açmak istediğinizden emin misiniz?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Dönem taslak durumuna dönecek ve düzenlenebilir olacak.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmReopen(null)}>İptal</Button>
+          <Button onClick={handleReopenStatement} variant="contained" color="warning">
+            Evet, Yeniden Aç
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Silme Onay Dialogu */}
       <Dialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}>
         <DialogTitle>Dönemi Sil</DialogTitle>
@@ -456,6 +516,17 @@ const PartnerDetailPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Geçmiş Modal */}
+      {historyStatement && (
+        <PartnerStatementHistoryModal
+          open={!!historyStatement}
+          onClose={() => setHistoryStatement(null)}
+          statementId={historyStatement.id}
+          year={historyStatement.year}
+          month={historyStatement.month}
+        />
+      )}
     </Box>
   );
 };

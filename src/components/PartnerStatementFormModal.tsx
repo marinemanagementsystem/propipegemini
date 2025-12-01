@@ -24,6 +24,9 @@ import {
 } from '../services/partners';
 import { useAuth } from '../context/AuthContext';
 
+// SUPER_ADMIN kontrolü için helper
+const isSuperAdmin = (role?: string): boolean => role === 'SUPER_ADMIN';
+
 interface PartnerStatementFormModalProps {
   open: boolean;
   onClose: () => void;
@@ -41,7 +44,8 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
   partnerBaseSalary,
   statement,
 }) => {
-  const { currentUserAuth } = useAuth();
+  const { currentUserAuth, currentUserProfile } = useAuth();
+  const canEditPreviousBalance = isSuperAdmin(currentUserProfile?.role);
   const isEditing = !!statement;
 
   const currentDate = new Date();
@@ -80,6 +84,7 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
     formData.profitShare,
     formData.actualWithdrawn,
   ]);
+  const isOverdrawn = calculatedNextMonthBalance > 0;
 
   // Modal açıldığında formu hazırla
   useEffect(() => {
@@ -98,8 +103,8 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
           actualWithdrawn: statement.actualWithdrawn,
           note: statement.note || '',
         });
-        // Düzenlemede previousBalance genelde değiştirilemez (zaten set edilmiş)
-        setPreviousBalanceEditable(false);
+        // Düzenlemede previousBalance sadece SUPER_ADMIN düzenleyebilir
+        setPreviousBalanceEditable(canEditPreviousBalance);
       } else {
         // Yeni oluşturma modu
         try {
@@ -114,7 +119,8 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
             actualWithdrawn: 0,
             note: '',
           });
-          setPreviousBalanceEditable(suggested.isEditable);
+          // SUPER_ADMIN her zaman düzenleyebilir, değilse suggested.isEditable'a bak
+          setPreviousBalanceEditable(canEditPreviousBalance || suggested.isEditable);
         } catch (err) {
           console.error('Devreden bakiye alınırken hata:', err);
           setFormData({
@@ -127,7 +133,7 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
             actualWithdrawn: 0,
             note: '',
           });
-          setPreviousBalanceEditable(true);
+          setPreviousBalanceEditable(canEditPreviousBalance || true);
         }
       }
       setError(null);
@@ -135,7 +141,7 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
     };
 
     initializeForm();
-  }, [statement, open, partnerId, partnerBaseSalary, currentMonth, currentYear]);
+  }, [statement, open, partnerId, partnerBaseSalary, currentMonth, currentYear, canEditPreviousBalance]);
 
   // Ay/yıl değiştiğinde mevcut statement kontrolü
   useEffect(() => {
@@ -279,13 +285,22 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
             fullWidth
             disabled={!previousBalanceEditable}
             helperText={
-              previousBalanceEditable
-                ? 'İlk dönem için açılış bakiyesi girebilirsiniz.'
-                : 'Önceki dönemden devir (otomatik)'
+              canEditPreviousBalance
+                ? 'SUPER ADMIN: Manuel düzenleme yapabilirsiniz'
+                : previousBalanceEditable
+                  ? 'İlk dönem için açılış bakiyesi girebilirsiniz.'
+                  : 'Önceki dönemden devir (otomatik)'
             }
             InputProps={{
               endAdornment: <InputAdornment position="end">₺</InputAdornment>,
             }}
+            sx={canEditPreviousBalance && previousBalanceEditable ? {
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: 'warning.main',
+                },
+              },
+            } : {}}
           />
 
           {/* Kişisel Harcama İadesi */}
@@ -360,8 +375,8 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
           <Paper 
             sx={{ 
               p: 2, 
-              backgroundColor: calculatedNextMonthBalance >= 0 ? 'success.light' : 'error.light',
-              color: calculatedNextMonthBalance >= 0 ? 'success.contrastText' : 'error.contrastText',
+              backgroundColor: isOverdrawn ? 'warning.light' : 'success.light',
+              color: isOverdrawn ? 'warning.contrastText' : 'success.contrastText',
             }}
           >
             <Typography variant="subtitle2" gutterBottom>
@@ -371,7 +386,7 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
               {formatCurrency(calculatedNextMonthBalance)}
             </Typography>
             <Typography variant="caption">
-              {calculatedNextMonthBalance >= 0 ? 'Şirket ortağa borçlu' : 'Ortak şirkete borçlu'}
+              {isOverdrawn ? 'Fazla alınan - ortak şirkete borçlu' : 'Eksik alınan - şirket ortağa borçlu'}
             </Typography>
           </Paper>
         </Box>

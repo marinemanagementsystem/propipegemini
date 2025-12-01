@@ -1,16 +1,16 @@
 import { Timestamp } from "firebase/firestore";
 
 /**
- * Partner (Ortak) - Şirket ortaklarını temsil eder
- * currentBalance: Pozitif = Şirket ortağa borçlu, Negatif = Ortak şirkete borçlu
+ * Partner (Ortak) - Sirket ortaklarini temsil eder
+ * currentBalance: Pozitif = Fazla alinan (ortak sirket borclu), Negatif = Eksik alinan (sirket ortaga borclu)
  */
 export interface Partner {
   id: string;
-  name: string;                  // Ortak adı (Ömer, Burak, Kazım vb.)
-  sharePercentage: number;       // Hisse oranı (%, örn: 40)
-  baseSalary: number;            // Aylık sabit maaş (örn: 30000)
+  name: string;                  // Ortak adi (Omer, Burak, Kazim vb.)
+  sharePercentage: number;       // Hisse orani (%, orn: 40)
+  baseSalary: number;            // Aylik sabit maas (orn: 30000)
   
-  currentBalance: number;        // Güncel bakiye (son CLOSED statement'tan)
+  currentBalance: number;        // Guncel bakiye (son CLOSED statement'tan)
   isActive: boolean;             // Ortak aktif mi?
 
   createdAt: Timestamp;
@@ -26,30 +26,30 @@ export interface Partner {
 }
 
 /**
- * PartnerStatement - Ortağın aylık hesap özeti
- * Her ortak için her ay bir statement kaydı tutulur
+ * PartnerStatement - Ortaklarin aylik hesap ozeti
+ * Her ortak icin her ay bir statement kaydi tutulur
  * 
- * Formül:
- * nextMonthBalance = previousBalance + personalExpenseReimbursement + monthlySalary + profitShare - actualWithdrawn
+ * Formul:
+ * nextMonthBalance = previousBalance + actualWithdrawn - (personalExpenseReimbursement + monthlySalary + profitShare)
  */
 export interface PartnerStatement {
   id: string;
-  partnerId: string;             // İlgili ortak ID'si
+  partnerId: string;             // Ilgili ortak ID'si
 
   month: number;                 // Ay (1-12, Ocak=1)
-  year: number;                  // Yıl (örn: 2025)
+  year: number;                  // Yil (orn: 2025)
 
-  status: "DRAFT" | "CLOSED";    // Taslak veya Kapalı
+  status: "DRAFT" | "CLOSED";    // Taslak veya Kapali
 
-  // Hesap alanları
-  previousBalance: number;               // Önceki aydan devreden bakiye
-  personalExpenseReimbursement: number;  // Bu ay ödenen kişisel gider iadesi
-  monthlySalary: number;                 // Bu ay maaş
-  profitShare: number;                   // Bu ay kar payı
-  actualWithdrawn: number;               // Bu ay fiilen çekilen para
+  // Hesap alanlari
+  previousBalance: number;               // Onceki aydan devreden bakiye
+  personalExpenseReimbursement: number;  // Bu ay odenen kisisel gider iadesi
+  monthlySalary: number;                 // Bu ay maas
+  profitShare: number;                   // Bu ay kar payi
+  actualWithdrawn: number;               // Bu ay fiilen cekilen para
   nextMonthBalance: number;              // Hesaplanan sonraki ay bakiyesi
 
-  note?: string;                 // Opsiyonel açıklama
+  note?: string;                 // Opsiyonel aciklama
 
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -64,7 +64,7 @@ export interface PartnerStatement {
 }
 
 /**
- * Partner oluşturma/güncelleme için form data
+ * Partner olusturma/guncelleme icin form data
  */
 export interface PartnerFormData {
   name: string;
@@ -73,7 +73,7 @@ export interface PartnerFormData {
 }
 
 /**
- * PartnerStatement oluşturma/güncelleme için form data
+ * PartnerStatement olusturma/guncelleme icin form data
  */
 export interface PartnerStatementFormData {
   month: number;
@@ -87,7 +87,22 @@ export interface PartnerStatementFormData {
 }
 
 /**
- * Ay isimleri (Türkçe)
+ * Partner Statement History Entry - Dönem değişiklik geçmişi
+ */
+export interface PartnerStatementHistoryEntry {
+  id: string;
+  statementId: string;
+  partnerId: string;
+  previousData: Partial<PartnerStatement>;
+  changedAt: import('firebase/firestore').Timestamp;
+  changedByUserId: string;
+  changedByEmail?: string;
+  changedByDisplayName?: string;
+  changeType: 'CREATE' | 'UPDATE' | 'DELETE' | 'CLOSE' | 'REOPEN';
+}
+
+/**
+ * Ay isimleri (Turkce)
  */
 export const MONTH_NAMES: Record<number, string> = {
   1: 'Ocak',
@@ -106,6 +121,7 @@ export const MONTH_NAMES: Record<number, string> = {
 
 /**
  * nextMonthBalance hesaplama fonksiyonu
+ * Yeni mantik: onceki bakiye + gercekte cekilen - (kisisel harcama iadesi + maas + kar payi)
  */
 export const calculateNextMonthBalance = (
   previousBalance: number,
@@ -114,5 +130,5 @@ export const calculateNextMonthBalance = (
   profitShare: number,
   actualWithdrawn: number
 ): number => {
-  return previousBalance + personalExpenseReimbursement + monthlySalary + profitShare - actualWithdrawn;
+  return previousBalance + actualWithdrawn - (personalExpenseReimbursement + monthlySalary + profitShare);
 };
