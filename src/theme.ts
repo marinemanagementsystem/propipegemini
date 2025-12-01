@@ -36,6 +36,23 @@ const brandColors = {
 
 export const getTheme = (mode: 'light' | 'dark') => {
       const isDark = mode === 'dark';
+      const backgroundGradient = isDark
+            ? `
+                  radial-gradient(1200px 1200px at 15% 20%, rgba(99, 102, 241, 0.12), transparent),
+                  radial-gradient(1000px 1000px at 85% 0%, rgba(14, 116, 144, 0.12), transparent),
+                  radial-gradient(800px 800px at 50% 90%, rgba(34, 197, 94, 0.08), transparent),
+                  #0a0f1f
+            `
+            : `
+                  radial-gradient(1200px 1200px at 18% 18%, rgba(79, 70, 229, 0.08), transparent),
+                  radial-gradient(1000px 1000px at 82% 0%, rgba(6, 182, 212, 0.08), transparent),
+                  radial-gradient(800px 800px at 45% 95%, rgba(34, 197, 94, 0.06), transparent),
+                  #f6f8fb
+            `;
+      const panelBackground = isDark
+            ? `linear-gradient(145deg, rgba(15, 23, 42, 0.92) 0%, rgba(12, 19, 36, 0.88) 100%)`
+            : `linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(244, 247, 252, 0.9) 100%)`;
+      const borderColor = isDark ? alpha('#94a3b8', 0.14) : alpha('#0f172a', 0.08);
       
       return createTheme({
             palette: {
@@ -77,8 +94,8 @@ export const getTheme = (mode: 'light' | 'dark') => {
                         contrastText: '#ffffff',
                   },
                   background: {
-                        default: isDark ? '#0f172a' : '#f1f5f9', // Slate 900 : Slate 100 (daha koyu arka plan)
-                        paper: isDark ? '#1e293b' : '#ffffff', // Slate 800 : White
+                        default: isDark ? '#0b1224' : '#f4f6fb',
+                        paper: isDark ? alpha('#0f172a', 0.85) : '#ffffff',
                   },
                   text: {
                         primary: isDark ? '#f1f5f9' : '#0f172a', // Slate 100 : Slate 900 (daha koyu metin)
@@ -87,7 +104,7 @@ export const getTheme = (mode: 'light' | 'dark') => {
                   divider: isDark ? alpha('#94a3b8', 0.12) : alpha('#334155', 0.15),
             },
             typography: {
-                  fontFamily: '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontFamily: '"Sora", "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   h1: {
                         fontWeight: 800,
                         letterSpacing: '-0.025em',
@@ -140,6 +157,10 @@ export const getTheme = (mode: 'light' | 'dark') => {
                   MuiCssBaseline: {
                         styleOverrides: {
                               body: {
+                                    backgroundColor: isDark ? '#0b1224' : '#f6f8fb',
+                                    backgroundImage: backgroundGradient,
+                                    backgroundAttachment: 'fixed',
+                                    color: isDark ? '#e2e8f0' : '#0f172a',
                                     scrollbarWidth: 'thin',
                                     '&::-webkit-scrollbar': {
                                           width: '8px',
@@ -202,18 +223,19 @@ export const getTheme = (mode: 'light' | 'dark') => {
                   MuiCard: {
                         styleOverrides: {
                               root: {
-                                    borderRadius: 20,
+                                    borderRadius: 22,
                                     boxShadow: isDark 
-                                          ? '0 4px 24px rgba(0, 0, 0, 0.4)' 
-                                          : '0 4px 24px rgba(0, 0, 0, 0.08)',
-                                    border: `1px solid ${isDark ? alpha('#94a3b8', 0.1) : alpha('#334155', 0.12)}`,
-                                    backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                                          ? '0 20px 60px rgba(0, 0, 0, 0.45)' 
+                                          : '0 20px 50px rgba(15, 23, 42, 0.08)',
+                                    border: `1px solid ${borderColor}`,
+                                    backgroundImage: panelBackground,
+                                    backdropFilter: 'blur(12px)',
                                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                     '&:hover': {
                                           boxShadow: isDark 
-                                                ? '0 8px 32px rgba(0, 0, 0, 0.5)' 
-                                                : '0 8px 32px rgba(0, 0, 0, 0.12)',
-                                          transform: 'translateY(-2px)',
+                                                ? '0 28px 72px rgba(0, 0, 0, 0.55)' 
+                                                : '0 28px 72px rgba(15, 23, 42, 0.12)',
+                                          transform: 'translateY(-3px)',
                                     },
                               },
                         },
@@ -221,22 +243,24 @@ export const getTheme = (mode: 'light' | 'dark') => {
                   MuiPaper: {
                         styleOverrides: {
                               root: {
-                                    backgroundImage: 'none',
+                                    backgroundImage: panelBackground,
+                                    border: `1px solid ${borderColor}`,
+                                    backdropFilter: 'blur(12px)',
                               },
                               elevation1: {
                                     boxShadow: isDark 
-                                          ? '0 2px 12px rgba(0, 0, 0, 0.3)' 
-                                          : '0 2px 12px rgba(0, 0, 0, 0.04)',
+                                          ? '0 12px 40px rgba(0, 0, 0, 0.35)' 
+                                          : '0 12px 40px rgba(15, 23, 42, 0.06)',
                               },
                               elevation2: {
                                     boxShadow: isDark 
-                                          ? '0 4px 20px rgba(0, 0, 0, 0.35)' 
-                                          : '0 4px 20px rgba(0, 0, 0, 0.06)',
+                                          ? '0 16px 48px rgba(0, 0, 0, 0.45)' 
+                                          : '0 16px 48px rgba(15, 23, 42, 0.08)',
                               },
                               elevation3: {
                                     boxShadow: isDark 
-                                          ? '0 8px 28px rgba(0, 0, 0, 0.4)' 
-                                          : '0 8px 28px rgba(0, 0, 0, 0.08)',
+                                          ? '0 24px 64px rgba(0, 0, 0, 0.5)' 
+                                          : '0 24px 64px rgba(15, 23, 42, 0.12)',
                               },
                         },
                   },
