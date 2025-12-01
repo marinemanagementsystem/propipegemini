@@ -124,8 +124,9 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
                                                 label="Tutar*"
                                                 type="number"
                                                 fullWidth
-                                                value={formData.amount}
+                                                value={formData.amount === 0 ? '' : formData.amount}
                                                 onChange={(e) => handleChange('amount', e.target.value)}
+                                                onFocus={(e) => e.target.select()}
                                                 required
                                                 InputProps={{ sx: { borderRadius: 2 } }}
                                           />

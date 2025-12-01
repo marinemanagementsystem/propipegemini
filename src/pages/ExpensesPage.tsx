@@ -24,10 +24,18 @@ import {
       ToggleButton,
       ToggleButtonGroup,
       Stack,
-      Avatar
+      Avatar,
+      Tabs,
+      Tab,
+      alpha,
+      InputAdornment,
+      Tooltip,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import HistoryIcon from '@mui/icons-material/History';
 import AddIcon from '@mui/icons-material/Add';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import ViewListIcon from '@mui/icons-material/ViewList';
@@ -38,29 +46,51 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import BusinessIcon from '@mui/icons-material/Business';
+import LogoutIcon from '@mui/icons-material/Logout';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import SearchIcon from '@mui/icons-material/Search';
 
-import { getExpenses, createExpense, updateExpense, deleteExpense } from '../services/expenses';
+import { getExpenses, createExpense, updateExpense, deleteExpense, hardDeleteExpense } from '../services/expenses';
 import type { Expense, ExpenseFormData } from '../types/Expense';
 import ExpenseFormModal from '../components/ExpenseFormModal';
+import ExpenseHistoryModal from '../components/ExpenseHistoryModal';
 import { seedData } from '../utils/seedData';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const ExpensesPage: React.FC = () => {
       const [expenses, setExpenses] = useState<Expense[]>([]);
       const [loading, setLoading] = useState(false);
+      const theme = useTheme();
+      const isDark = theme.palette.mode === 'dark';
+
+      // Auth
+      const { currentUserAuth, currentUserProfile, logout } = useAuth();
+      const navigate = useNavigate();
 
       // Filters
       const [startDate, setStartDate] = useState<Date | null>(null);
       const [endDate, setEndDate] = useState<Date | null>(null);
       const [filterType, setFilterType] = useState<string>('ALL');
       const [filterStatus, setFilterStatus] = useState<string>('ALL');
+      const [filterOwner, setFilterOwner] = useState<string>('ALL'); // NEW: Owner Filter
 
-      // View Mode
-      const [viewMode, setViewMode] = useState<'TABLE' | 'SIMPLE'>('SIMPLE'); // Default to SIMPLE for better UI showcase
+      // View Mode & Tabs
+      const [viewMode, setViewMode] = useState<'TABLE' | 'SIMPLE'>('SIMPLE');
+      const [tabValue, setTabValue] = useState(0); // 0: Active, 1: Deleted
 
       // Modal State
       const [modalOpen, setModalOpen] = useState(false);
       const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
       const [submitting, setSubmitting] = useState(false);
+
+      // History Modal
+      const [historyModalOpen, setHistoryModalOpen] = useState(false);
+      const [selectedExpenseIdForHistory, setSelectedExpenseIdForHistory] = useState<string | null>(null);
 
       // Summary Data
       const [summaryUnpaid, setSummaryUnpaid] = useState(0);
@@ -69,9 +99,10 @@ const ExpensesPage: React.FC = () => {
       const fetchData = async () => {
             setLoading(true);
             try {
-                  const data = await getExpenses(startDate, endDate, filterType, filterStatus);
+                  const showDeleted = tabValue === 1;
+                  const data = await getExpenses(startDate, endDate, filterType, filterStatus, showDeleted);
                   setExpenses(data);
-                  calculateSummary(data);
+                  // Summary calculation will be done in useEffect to respect owner filter
             } catch (error) {
                   console.error("Error fetching expenses:", error);
             } finally {
@@ -81,10 +112,26 @@ const ExpensesPage: React.FC = () => {
 
       useEffect(() => {
             fetchData();
-      }, [startDate, endDate, filterType, filterStatus]);
+      }, [startDate, endDate, filterType, filterStatus, tabValue]);
+
+      // Derived State: Filtered Expenses (Client-side Owner Filter)
+      const displayedExpenses = expenses.filter(expense => {
+            if (filterOwner === 'ALL') return true;
+            return expense.ownerId === filterOwner;
+      });
+
+      // Derived State: Unique Owners for Dropdown
+      const uniqueOwners = Array.from(new Set(expenses.map(e => e.ownerId))).filter(Boolean).sort();
+
+      useEffect(() => {
+            // Recalculate summary whenever displayedExpenses changes
+            if (tabValue === 0) {
+                  calculateSummary(displayedExpenses);
+            }
+      }, [displayedExpenses, tabValue]);
 
       const calculateSummary = (data: Expense[]) => {
-            // Summary 1: Total UNPAID (PERSONAL or ADVANCE)
+            // Summary 1: Total UNPAID
             const unpaidTotal = data
                   .filter(e => e.status === 'UNPAID')
                   .reduce((sum, e) => sum + e.amount, 0);
@@ -104,6 +151,11 @@ const ExpensesPage: React.FC = () => {
             setSummaryPaidThisMonth(paidThisMonthTotal);
       };
 
+      const handleLogout = async () => {
+            await logout();
+            navigate('/login');
+      };
+
       const handleCreate = () => {
             setEditingExpense(null);
             setModalOpen(true);
@@ -115,9 +167,15 @@ const ExpensesPage: React.FC = () => {
       };
 
       const handleDelete = async (id: string) => {
-            if (window.confirm("Bu gider kaydını silmek istediğinden emin misin?")) {
+            if (window.confirm("Bu gideri silmek istediğinizden emin misiniz? (Geri Dönüşüm Kutusuna taşınacak)")) {
                   try {
-                        await deleteExpense(id);
+                        const user = currentUserAuth ? {
+                              uid: currentUserAuth.uid,
+                              email: currentUserAuth.email,
+                              displayName: currentUserProfile?.displayName
+                        } : undefined;
+
+                        await deleteExpense(id, user);
                         fetchData();
                   } catch (error) {
                         console.error("Error deleting expense:", error);
@@ -126,13 +184,36 @@ const ExpensesPage: React.FC = () => {
             }
       };
 
+      const handleHardDelete = async (id: string) => {
+            if (window.confirm("DİKKAT: Bu gider KALICI OLARAK silinecek! Geri alınamaz. Emin misiniz?")) {
+                  try {
+                        await hardDeleteExpense(id);
+                        fetchData();
+                  } catch (error) {
+                        console.error("Error hard deleting expense:", error);
+                        alert("Kalıcı silme işlemi başarısız oldu.");
+                  }
+            }
+      };
+
+      const handleHistory = (id: string) => {
+            setSelectedExpenseIdForHistory(id);
+            setHistoryModalOpen(true);
+      };
+
       const handleFormSubmit = async (data: ExpenseFormData) => {
             setSubmitting(true);
             try {
+                  const user = currentUserAuth ? {
+                        uid: currentUserAuth.uid,
+                        email: currentUserAuth.email,
+                        displayName: currentUserProfile?.displayName
+                  } : undefined;
+
                   if (editingExpense) {
-                        await updateExpense(editingExpense.id, data);
+                        await updateExpense(editingExpense.id, data, user);
                   } else {
-                        await createExpense(data);
+                        await createExpense(data, user);
                   }
                   setModalOpen(false);
                   fetchData();
@@ -150,12 +231,22 @@ const ExpensesPage: React.FC = () => {
             }
       };
 
+      const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+            setTabValue(newValue);
+      };
+
       const handleImportData = async () => {
             if (window.confirm("Örnek veriler yüklenecek. Onaylıyor musunuz?")) {
                   setLoading(true);
                   try {
+                        const user = currentUserAuth ? {
+                              uid: currentUserAuth.uid,
+                              email: currentUserAuth.email,
+                              displayName: currentUserProfile?.displayName
+                        } : undefined;
+
                         for (const data of seedData) {
-                              await createExpense(data);
+                              await createExpense(data, user);
                         }
                         alert("Veriler başarıyla yüklendi!");
                         fetchData();
@@ -170,7 +261,6 @@ const ExpensesPage: React.FC = () => {
 
       const formatDate = (date: any) => {
             if (!date) return '-';
-            // Handle Firestore Timestamp or JS Date
             const d = date.toDate ? date.toDate() : new Date(date);
             return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
       };
@@ -194,194 +284,409 @@ const ExpensesPage: React.FC = () => {
       };
 
       return (
-            <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-                  {/* Header */}
-                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-                        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-                              Giderler
-                        </Typography>
-                        <Stack direction="row" spacing={2}>
-                              <ToggleButtonGroup
-                                    value={viewMode}
-                                    exclusive
-                                    onChange={handleViewChange}
-                                    aria-label="görünüm"
-                                    size="small"
-                                    sx={{ bgcolor: 'background.paper' }}
-                              >
-                                    <ToggleButton value="TABLE" aria-label="tablo görünümü">
-                                          <ViewListIcon sx={{ mr: 1 }} /> Tablo
-                                    </ToggleButton>
-                                    <ToggleButton value="SIMPLE" aria-label="sade görünüm">
-                                          <ViewModuleIcon sx={{ mr: 1 }} /> Kartlar
-                                    </ToggleButton>
-                              </ToggleButtonGroup>
-                              <Button
-                                    variant="outlined"
-                                    startIcon={<CloudUploadIcon />}
-                                    onClick={handleImportData}
-                                    color="secondary"
-                              >
-                                    Verileri Yükle
-                              </Button>
-                              <Button
-                                    variant="contained"
-                                    startIcon={<AddIcon />}
-                                    onClick={handleCreate}
-                                    sx={{ px: 3 }}
-                              >
-                                    Yeni
-                              </Button>
-                        </Stack>
+            <Box sx={{ minHeight: '100vh', pb: 6 }}>
+                  {/* Hero Section */}
+                  <Box 
+                        sx={{ 
+                              background: isDark 
+                                    ? `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.3)} 0%, ${alpha('#0f172a', 0.9)} 100%)`
+                                    : `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.1)} 0%, ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
+                              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                              pt: 4,
+                              pb: 5,
+                        }}
+                  >
+                        <Container maxWidth="xl">
+                              {/* Header */}
+                              <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={3} mb={4}>
+                                    <Box>
+                                          <Typography 
+                                                variant="h3" 
+                                                fontWeight={800} 
+                                                sx={{ 
+                                                      mb: 1,
+                                                      background: isDark 
+                                                            ? `linear-gradient(135deg, #fff 0%, ${theme.palette.primary.light} 100%)`
+                                                            : `linear-gradient(135deg, ${theme.palette.text.primary} 0%, ${theme.palette.primary.main} 100%)`,
+                                                      backgroundClip: 'text',
+                                                      WebkitBackgroundClip: 'text',
+                                                      WebkitTextFillColor: 'transparent',
+                                                }}
+                                          >
+                                                Giderler
+                                          </Typography>
+                                          <Typography variant="body1" color="text.secondary">
+                                                Tüm şirket giderlerinizi takip edin ve yönetin
+                                          </Typography>
+                                    </Box>
+                                    <Stack direction="row" spacing={2} flexWrap="wrap">
+                                          <ToggleButtonGroup
+                                                value={viewMode}
+                                                exclusive
+                                                onChange={handleViewChange}
+                                                aria-label="görünüm"
+                                                size="small"
+                                                sx={{ 
+                                                      bgcolor: alpha(theme.palette.background.paper, 0.8),
+                                                      borderRadius: 2,
+                                                      '& .MuiToggleButton-root': {
+                                                            border: 'none',
+                                                            px: 2,
+                                                      },
+                                                }}
+                                          >
+                                                <ToggleButton value="TABLE" aria-label="tablo görünümü">
+                                                      <ViewListIcon sx={{ mr: 0.5 }} fontSize="small" /> Tablo
+                                                </ToggleButton>
+                                                <ToggleButton value="SIMPLE" aria-label="sade görünüm">
+                                                      <ViewModuleIcon sx={{ mr: 0.5 }} fontSize="small" /> Kartlar
+                                                </ToggleButton>
+                                          </ToggleButtonGroup>
+                                          <Tooltip title="Örnek veri yükle">
+                                                <Button
+                                                      variant="outlined"
+                                                      startIcon={<CloudUploadIcon />}
+                                                      onClick={handleImportData}
+                                                      sx={{ 
+                                                            borderColor: alpha(theme.palette.divider, 0.3),
+                                                            color: 'text.secondary',
+                                                            '&:hover': {
+                                                                  borderColor: theme.palette.primary.main,
+                                                                  color: 'primary.main',
+                                                            },
+                                                      }}
+                                                >
+                                                      İçe Aktar
+                                                </Button>
+                                          </Tooltip>
+                                          <Button
+                                                variant="contained"
+                                                startIcon={<AddIcon />}
+                                                onClick={handleCreate}
+                                                sx={{ 
+                                                      px: 4,
+                                                      boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.3)}`,
+                                                }}
+                                          >
+                                                Yeni Gider
+                                          </Button>
+                                    </Stack>
+                              </Box>
+
+                              {/* Summary Cards */}
+                              {tabValue === 0 && (
+                                    <Grid container spacing={3}>
+                                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                                                <Paper 
+                                                      elevation={0}
+                                                      sx={{ 
+                                                            p: 3, 
+                                                            borderRadius: 4,
+                                                            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                                            bgcolor: alpha(theme.palette.background.paper, 0.6),
+                                                            backdropFilter: 'blur(8px)',
+                                                      }}
+                                                >
+                                                      <Box display="flex" alignItems="center" gap={2}>
+                                                            <Box 
+                                                                  sx={{ 
+                                                                        width: 48, 
+                                                                        height: 48, 
+                                                                        borderRadius: 3,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        background: `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${theme.palette.warning.dark} 100%)`,
+                                                                  }}
+                                                            >
+                                                                  <WarningAmberIcon sx={{ color: 'white', fontSize: 24 }} />
+                                                            </Box>
+                                                            <Box>
+                                                                  <Typography variant="h5" fontWeight={700} color="warning.main">
+                                                                        {summaryUnpaid.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
+                                                                  </Typography>
+                                                                  <Typography variant="body2" color="text.secondary">
+                                                                        Bekleyen Ödemeler
+                                                                  </Typography>
+                                                            </Box>
+                                                      </Box>
+                                                </Paper>
+                                          </Grid>
+                                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                                                <Paper 
+                                                      elevation={0}
+                                                      sx={{ 
+                                                            p: 3, 
+                                                            borderRadius: 4,
+                                                            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                                            bgcolor: alpha(theme.palette.background.paper, 0.6),
+                                                            backdropFilter: 'blur(8px)',
+                                                      }}
+                                                >
+                                                      <Box display="flex" alignItems="center" gap={2}>
+                                                            <Box 
+                                                                  sx={{ 
+                                                                        width: 48, 
+                                                                        height: 48, 
+                                                                        borderRadius: 3,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
+                                                                  }}
+                                                            >
+                                                                  <CheckCircleIcon sx={{ color: 'white', fontSize: 24 }} />
+                                                            </Box>
+                                                            <Box>
+                                                                  <Typography variant="h5" fontWeight={700} color="success.main">
+                                                                        {summaryPaidThisMonth.toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
+                                                                  </Typography>
+                                                                  <Typography variant="body2" color="text.secondary">
+                                                                        Bu Ay Ödenen
+                                                                  </Typography>
+                                                            </Box>
+                                                      </Box>
+                                                </Paper>
+                                          </Grid>
+                                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                                                <Paper 
+                                                      elevation={0}
+                                                      sx={{ 
+                                                            p: 3, 
+                                                            borderRadius: 4,
+                                                            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                                            bgcolor: alpha(theme.palette.background.paper, 0.6),
+                                                            backdropFilter: 'blur(8px)',
+                                                      }}
+                                                >
+                                                      <Box display="flex" alignItems="center" gap={2}>
+                                                            <Box 
+                                                                  sx={{ 
+                                                                        width: 48, 
+                                                                        height: 48, 
+                                                                        borderRadius: 3,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        background: `linear-gradient(135deg, ${theme.palette.info.main} 0%, ${theme.palette.info.dark} 100%)`,
+                                                                  }}
+                                                            >
+                                                                  <ReceiptIcon sx={{ color: 'white', fontSize: 24 }} />
+                                                            </Box>
+                                                            <Box>
+                                                                  <Typography variant="h5" fontWeight={700}>
+                                                                        {displayedExpenses.length}
+                                                                  </Typography>
+                                                                  <Typography variant="body2" color="text.secondary">
+                                                                        Toplam Kayıt
+                                                                  </Typography>
+                                                            </Box>
+                                                      </Box>
+                                                </Paper>
+                                          </Grid>
+                                          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                                                <Paper 
+                                                      elevation={0}
+                                                      sx={{ 
+                                                            p: 3, 
+                                                            borderRadius: 4,
+                                                            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                                            bgcolor: alpha(theme.palette.background.paper, 0.6),
+                                                            backdropFilter: 'blur(8px)',
+                                                      }}
+                                                >
+                                                      <Box display="flex" alignItems="center" gap={2}>
+                                                            <Box 
+                                                                  sx={{ 
+                                                                        width: 48, 
+                                                                        height: 48, 
+                                                                        borderRadius: 3,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`,
+                                                                  }}
+                                                            >
+                                                                  <TrendingDownIcon sx={{ color: 'white', fontSize: 24 }} />
+                                                            </Box>
+                                                            <Box>
+                                                                  <Typography variant="h5" fontWeight={700} color="error.main">
+                                                                        {displayedExpenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
+                                                                  </Typography>
+                                                                  <Typography variant="body2" color="text.secondary">
+                                                                        Toplam Gider
+                                                                  </Typography>
+                                                            </Box>
+                                                      </Box>
+                                                </Paper>
+                                          </Grid>
+                                    </Grid>
+                              )}
+                        </Container>
                   </Box>
 
-                  {/* Summary Cards */}
-                  <Grid container spacing={3} mb={4}>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                              <Card sx={{
-                                    bgcolor: '#fff9c4', // Light yellow background
-                                    border: '1px solid #ffe082',
-                                    borderRadius: 4,
-                                    position: 'relative',
-                                    overflow: 'visible'
-                              }}>
-                                    <Box sx={{
-                                          position: 'absolute',
-                                          top: -10,
-                                          left: 20,
-                                          width: 40,
-                                          height: 4,
-                                          bgcolor: '#ffc107',
-                                          borderRadius: 2
-                                    }} />
-                                    <CardContent sx={{ p: 3 }}>
-                                          <Typography variant="h4" sx={{ color: '#ff6f00', fontWeight: 'bold', mb: 1 }}>
-                                                {summaryUnpaid.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL
-                                          </Typography>
-                                          <Typography variant="subtitle1" sx={{ color: '#ff8f00' }}>
-                                                Toplam Ödenmedi
-                                          </Typography>
-                                    </CardContent>
-                              </Card>
-                        </Grid>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                              <Card sx={{
-                                    bgcolor: '#e0f2f1', // Light cyan background
-                                    border: '1px solid #80cbc4',
-                                    borderRadius: 4,
-                                    position: 'relative',
-                                    overflow: 'visible'
-                              }}>
-                                    <Box sx={{
-                                          position: 'absolute',
-                                          top: -10,
-                                          left: 20,
-                                          width: 40,
-                                          height: 4,
-                                          bgcolor: '#00bfa5',
-                                          borderRadius: 2
-                                    }} />
-                                    <CardContent sx={{ p: 3 }}>
-                                          <Typography variant="h4" sx={{ color: '#00695c', fontWeight: 'bold', mb: 1 }}>
-                                                {summaryPaidThisMonth.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL
-                                          </Typography>
-                                          <Typography variant="subtitle1" sx={{ color: '#00897b' }}>
-                                                Bu Ay Ödenen
-                                          </Typography>
-                                    </CardContent>
-                              </Card>
-                        </Grid>
-                  </Grid>
+                  <Container maxWidth="xl" sx={{ mt: 4 }}>
+                        {/* Tabs */}
+                        <Paper 
+                              elevation={0} 
+                              sx={{ 
+                                    mb: 3, 
+                                    borderRadius: 3,
+                                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                    overflow: 'hidden',
+                              }}
+                        >
+                              <Tabs 
+                                    value={tabValue} 
+                                    onChange={handleTabChange}
+                                    sx={{
+                                          bgcolor: alpha(theme.palette.background.paper, 0.8),
+                                          '& .MuiTab-root': {
+                                                py: 2,
+                                          },
+                                    }}
+                              >
+                                    <Tab label="Aktif Giderler" icon={<ReceiptIcon />} iconPosition="start" />
+                                    <Tab label="Silinen Giderler" icon={<DeleteIcon />} iconPosition="start" />
+                              </Tabs>
+                        </Paper>
 
-                  {/* Filters */}
-                  <Paper sx={{ p: 3, mb: 4, borderRadius: 3 }} elevation={0}>
-                        <Grid container spacing={2} alignItems="center">
-                              <Grid size={{ xs: 12, sm: 3 }}>
-                                    <TextField
-                                          label="Başlangıç Tarihi"
-                                          type="date"
-                                          fullWidth
-                                          InputLabelProps={{ shrink: true }}
-                                          value={startDate ? startDate.toISOString().split('T')[0] : ''}
-                                          onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
-                                          size="small"
-                                    />
+                        {/* Filters */}
+                        <Paper 
+                              elevation={0}
+                              sx={{ 
+                                    p: 3, 
+                                    mb: 3, 
+                                    borderRadius: 3,
+                                    border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                              }}
+                        >
+                              <Box display="flex" alignItems="center" gap={2} mb={2}>
+                                    <FilterListIcon sx={{ color: 'text.secondary' }} />
+                                    <Typography variant="subtitle1" fontWeight={600}>
+                                          Filtreler
+                                    </Typography>
+                              </Box>
+                              <Grid container spacing={2}>
+                                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                                          <TextField
+                                                label="Başlangıç Tarihi"
+                                                type="date"
+                                                fullWidth
+                                                InputLabelProps={{ shrink: true }}
+                                                value={startDate ? startDate.toISOString().split('T')[0] : ''}
+                                                onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
+                                                size="small"
+                                          />
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                                          <TextField
+                                                label="Bitiş Tarihi"
+                                                type="date"
+                                                fullWidth
+                                                InputLabelProps={{ shrink: true }}
+                                                value={endDate ? endDate.toISOString().split('T')[0] : ''}
+                                                onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
+                                                size="small"
+                                          />
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6, md: 2.5 }}>
+                                          <FormControl fullWidth size="small">
+                                                <InputLabel>Gider Türü</InputLabel>
+                                                <Select
+                                                      value={filterType}
+                                                      label="Gider Türü"
+                                                      onChange={(e) => setFilterType(e.target.value)}
+                                                >
+                                                      <MenuItem value="ALL">Tümü</MenuItem>
+                                                      <MenuItem value="COMPANY_OFFICIAL">Şirket Resmi</MenuItem>
+                                                      <MenuItem value="PERSONAL">Kişisel</MenuItem>
+                                                      <MenuItem value="ADVANCE">Avans</MenuItem>
+                                                </Select>
+                                          </FormControl>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                                          <FormControl fullWidth size="small">
+                                                <InputLabel>Ödeme Durumu</InputLabel>
+                                                <Select
+                                                      value={filterStatus}
+                                                      label="Ödeme Durumu"
+                                                      onChange={(e) => setFilterStatus(e.target.value)}
+                                                >
+                                                      <MenuItem value="ALL">Tümü</MenuItem>
+                                                      <MenuItem value="PAID">Ödendi</MenuItem>
+                                                      <MenuItem value="UNPAID">Ödenmedi</MenuItem>
+                                                </Select>
+                                          </FormControl>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6, md: 3.5 }}>
+                                          <FormControl fullWidth size="small">
+                                                <InputLabel>Gider Sahibi</InputLabel>
+                                                <Select
+                                                      value={filterOwner}
+                                                      label="Gider Sahibi"
+                                                      onChange={(e) => setFilterOwner(e.target.value)}
+                                                >
+                                                      <MenuItem value="ALL">Tümü</MenuItem>
+                                                      {uniqueOwners.map(owner => (
+                                                            <MenuItem key={owner} value={owner}>{owner}</MenuItem>
+                                                      ))}
+                                                </Select>
+                                          </FormControl>
+                                    </Grid>
                               </Grid>
-                              <Grid size={{ xs: 12, sm: 3 }}>
-                                    <TextField
-                                          label="Bitiş Tarihi"
-                                          type="date"
-                                          fullWidth
-                                          InputLabelProps={{ shrink: true }}
-                                          value={endDate ? endDate.toISOString().split('T')[0] : ''}
-                                          onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
-                                          size="small"
-                                    />
-                              </Grid>
-                              <Grid size={{ xs: 12, sm: 3 }}>
-                                    <FormControl fullWidth size="small">
-                                          <InputLabel>Tür: Şirket/Kişisel</InputLabel>
-                                          <Select
-                                                value={filterType}
-                                                label="Tür: Şirket/Kişisel"
-                                                onChange={(e) => setFilterType(e.target.value)}
-                                          >
-                                                <MenuItem value="ALL">Tümü</MenuItem>
-                                                <MenuItem value="COMPANY_OFFICIAL">Şirket Resmi</MenuItem>
-                                                <MenuItem value="PERSONAL">Kişisel</MenuItem>
-                                                <MenuItem value="ADVANCE">Avans</MenuItem>
-                                          </Select>
-                                    </FormControl>
-                              </Grid>
-                              <Grid size={{ xs: 12, sm: 3 }}>
-                                    <FormControl fullWidth size="small">
-                                          <InputLabel>Durum: Ödendi/Ödenmedi</InputLabel>
-                                          <Select
-                                                value={filterStatus}
-                                                label="Durum: Ödendi/Ödenmedi"
-                                                onChange={(e) => setFilterStatus(e.target.value)}
-                                          >
-                                                <MenuItem value="ALL">Tümü</MenuItem>
-                                                <MenuItem value="PAID">Ödendi</MenuItem>
-                                                <MenuItem value="UNPAID">Ödenmedi</MenuItem>
-                                          </Select>
-                                    </FormControl>
-                              </Grid>
-                        </Grid>
-                  </Paper>
+                        </Paper>
 
-                  {/* Content Area */}
-                  {viewMode === 'TABLE' ? (
-                        <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: '1px solid #eee' }}>
-                              <Table>
-                                    <TableHead sx={{ bgcolor: '#f9fafb' }}>
-                                          <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Tarih</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Açıklama</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Tutar</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Tür</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Durum</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Gider Sahibi</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Ödeme Şekli</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Dekont</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>İşlemler</TableCell>
-                                          </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                          {expenses.map((expense) => (
-                                                <TableRow key={expense.id} hover>
-                                                      <TableCell>{formatDate(expense.date)}</TableCell>
-                                                      <TableCell>
-                                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                                  <Avatar sx={{ bgcolor: 'primary.light', width: 24, height: 24, fontSize: 14 }}>
-                                                                        {getCategoryIcon(expense.description)}
-                                                                  </Avatar>
-                                                                  <Typography variant="body2">{expense.description}</Typography>
-                                                            </Stack>
-                                                      </TableCell>
-                                                      <TableCell sx={{ fontWeight: 'bold' }}>
-                                                            {expense.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {expense.currency}
-                                                      </TableCell>
+                        {/* Content Area */}
+                        {viewMode === 'TABLE' ? (
+                              <TableContainer 
+                                    component={Paper} 
+                                    elevation={0} 
+                                    sx={{ 
+                                          borderRadius: 3, 
+                                          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                    }}
+                              >
+                                    <Table>
+                                          <TableHead>
+                                                <TableRow>
+                                                      <TableCell>Tarih</TableCell>
+                                                      <TableCell>Açıklama</TableCell>
+                                                      <TableCell>Tutar</TableCell>
+                                                      <TableCell>Tür</TableCell>
+                                                      <TableCell>Durum</TableCell>
+                                                      <TableCell>Gider Sahibi</TableCell>
+                                                      <TableCell>Ödeme Şekli</TableCell>
+                                                      <TableCell>Dekont</TableCell>
+                                                      <TableCell align="right">İşlemler</TableCell>
+                                                </TableRow>
+                                          </TableHead>
+                                          <TableBody>
+                                                {displayedExpenses.map((expense) => (
+                                                      <TableRow key={expense.id} hover>
+                                                            <TableCell>{formatDate(expense.date)}</TableCell>
+                                                            <TableCell>
+                                                                  <Stack direction="row" alignItems="center" spacing={1.5}>
+                                                                        <Avatar 
+                                                                              sx={{ 
+                                                                                    width: 32, 
+                                                                                    height: 32, 
+                                                                                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                                                                    color: 'primary.main',
+                                                                              }}
+                                                                        >
+                                                                              {getCategoryIcon(expense.description)}
+                                                                        </Avatar>
+                                                                        <Typography variant="body2" fontWeight={500}>
+                                                                              {expense.description}
+                                                                        </Typography>
+                                                                  </Stack>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                  <Typography fontWeight={700}>
+                                                                        {expense.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {expense.currency === 'TRY' ? '₺' : expense.currency}
+                                                                  </Typography>
+                                                            </TableCell>
                                                       <TableCell>{getTypeLabel(expense.type)}</TableCell>
                                                       <TableCell>
                                                             <Chip
@@ -407,17 +712,31 @@ const ExpensesPage: React.FC = () => {
                                                       </TableCell>
                                                       <TableCell>
                                                             <Stack direction="row">
-                                                                  <IconButton size="small" onClick={() => handleEdit(expense)}>
-                                                                        <EditIcon fontSize="small" />
+                                                                  <IconButton size="small" onClick={() => handleHistory(expense.id)} title="Geçmiş">
+                                                                        <HistoryIcon fontSize="small" />
                                                                   </IconButton>
-                                                                  <IconButton size="small" onClick={() => handleDelete(expense.id)} color="error">
-                                                                        <DeleteIcon fontSize="small" />
-                                                                  </IconButton>
+
+                                                                  {tabValue === 0 && (
+                                                                        <>
+                                                                              <IconButton size="small" onClick={() => handleEdit(expense)} title="Düzenle">
+                                                                                    <EditIcon fontSize="small" />
+                                                                              </IconButton>
+                                                                              <IconButton size="small" onClick={() => handleDelete(expense.id)} color="error" title="Sil">
+                                                                                    <DeleteIcon fontSize="small" />
+                                                                              </IconButton>
+                                                                        </>
+                                                                  )}
+
+                                                                  {tabValue === 1 && currentUserProfile?.role === 'ADMIN' && (
+                                                                        <IconButton size="small" onClick={() => handleHardDelete(expense.id)} color="error" title="Kalıcı Sil">
+                                                                              <DeleteForeverIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                  )}
                                                             </Stack>
                                                       </TableCell>
                                                 </TableRow>
                                           ))}
-                                          {expenses.length === 0 && !loading && (
+                                          {displayedExpenses.length === 0 && !loading && (
                                                 <TableRow>
                                                       <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                                                             <Typography color="textSecondary">Kayıt bulunamadı.</Typography>
@@ -429,8 +748,8 @@ const ExpensesPage: React.FC = () => {
                         </TableContainer>
                   ) : (
                         <Stack spacing={2}>
-                              {expenses.map((expense) => (
-                                    <Paper key={expense.id} sx={{ p: 2, borderRadius: 3, border: '1px solid #f0f0f0' }} elevation={0}>
+                              {displayedExpenses.map((expense) => (
+                                    <Paper key={expense.id} sx={{ p: 2, borderRadius: 3, border: '1px solid #f0f0f0', bgcolor: expense.isDeleted ? '#fff5f5' : 'inherit' }} elevation={0}>
                                           <Grid container alignItems="center" spacing={2}>
                                                 <Grid>
                                                       <Avatar sx={{
@@ -466,17 +785,31 @@ const ExpensesPage: React.FC = () => {
                                                       />
                                                 </Grid>
                                                 <Grid>
-                                                      <IconButton size="small" onClick={() => handleEdit(expense)}>
-                                                            <EditIcon fontSize="small" />
+                                                      <IconButton size="small" onClick={() => handleHistory(expense.id)} title="Geçmiş">
+                                                            <HistoryIcon fontSize="small" />
                                                       </IconButton>
-                                                      <IconButton size="small" color="error" onClick={() => handleDelete(expense.id)}>
-                                                            <DeleteIcon fontSize="small" />
-                                                      </IconButton>
+
+                                                      {tabValue === 0 && (
+                                                            <>
+                                                                  <IconButton size="small" onClick={() => handleEdit(expense)} title="Düzenle">
+                                                                        <EditIcon fontSize="small" />
+                                                                  </IconButton>
+                                                                  <IconButton size="small" color="error" onClick={() => handleDelete(expense.id)} title="Sil">
+                                                                        <DeleteIcon fontSize="small" />
+                                                                  </IconButton>
+                                                            </>
+                                                      )}
+
+                                                      {tabValue === 1 && currentUserProfile?.role === 'ADMIN' && (
+                                                            <IconButton size="small" onClick={() => handleHardDelete(expense.id)} color="error" title="Kalıcı Sil">
+                                                                  <DeleteForeverIcon fontSize="small" />
+                                                            </IconButton>
+                                                      )}
                                                 </Grid>
                                           </Grid>
                                     </Paper>
                               ))}
-                              {expenses.length === 0 && !loading && (
+                              {displayedExpenses.length === 0 && !loading && (
                                     <Paper sx={{ p: 3, textAlign: 'center' }}>
                                           <Typography color="textSecondary">Kayıt bulunamadı.</Typography>
                                     </Paper>
@@ -491,7 +824,15 @@ const ExpensesPage: React.FC = () => {
                         initialData={editingExpense}
                         loading={submitting}
                   />
-            </Container>
+
+                  <ExpenseHistoryModal
+                        open={historyModalOpen}
+                        onClose={() => setHistoryModalOpen(false)}
+                        expenseId={selectedExpenseIdForHistory}
+                        onRevertSuccess={fetchData}
+                  />
+                  </Container>
+            </Box>
       );
 };
 
