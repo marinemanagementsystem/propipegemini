@@ -15,7 +15,9 @@ import {
       Typography,
       IconButton,
       Chip,
-      CircularProgress
+      CircularProgress,
+      useMediaQuery,
+      useTheme,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import RestoreIcon from '@mui/icons-material/Restore';
@@ -111,13 +113,17 @@ const ExpenseHistoryModal: React.FC<ExpenseHistoryModalProps> = ({
             );
       };
 
+      const theme = useTheme();
+      const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
       return (
             <Dialog
                   open={open}
                   onClose={onClose}
                   maxWidth="md"
                   fullWidth
-                  PaperProps={{ sx: { borderRadius: 3 } }}
+                  fullScreen={fullScreen}
+                  PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3 } }}
             >
                   <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography component="div" variant="h6" fontWeight="bold">
@@ -137,8 +143,8 @@ const ExpenseHistoryModal: React.FC<ExpenseHistoryModalProps> = ({
                                     Henüz bir geçmiş kaydı yok.
                               </Typography>
                         ) : (
-                              <TableContainer component={Paper} elevation={0} variant="outlined">
-                                    <Table size="small">
+                              <TableContainer component={Paper} elevation={0} variant="outlined" sx={{ overflowX: 'auto' }}>
+                                    <Table size="small" sx={{ minWidth: 600 }}>
                                           <TableHead sx={{ bgcolor: '#f5f5f5' }}>
                                                 <TableRow>
                                                       <TableCell><strong>Tarih</strong></TableCell>

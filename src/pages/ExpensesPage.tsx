@@ -647,9 +647,10 @@ const ExpensesPage: React.FC = () => {
                                     sx={{ 
                                           borderRadius: 3, 
                                           border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                                          overflowX: 'auto',
                                     }}
                               >
-                                    <Table>
+                                    <Table sx={{ minWidth: 800 }}>
                                           <TableHead>
                                                 <TableRow>
                                                       <TableCell>Tarih</TableCell>

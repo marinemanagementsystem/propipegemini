@@ -426,8 +426,8 @@ const StatementEditorPage: React.FC = () => {
                                                 </Button>
                                           )}
                                     </Box>
-                                    <TableContainer sx={{ p: 0 }}>
-                                          <Table size="small">
+                                    <TableContainer sx={{ p: 0, overflowX: 'auto' }}>
+                                          <Table size="small" sx={{ minWidth: 600 }}>
                                                 <TableHead>
                                                       <TableRow sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.05)' : '#fafafa' }}>
                                                             <TableCell sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Açıklama</TableCell>
@@ -500,8 +500,8 @@ const StatementEditorPage: React.FC = () => {
                                                       ÖDENEN GİDERLER
                                                 </Typography>
                                           </Box>
-                                          <TableContainer>
-                                                <Table size="small">
+                                          <TableContainer sx={{ overflowX: 'auto' }}>
+                                                <Table size="small" sx={{ minWidth: 500 }}>
                                                       <TableHead>
                                                             <TableRow sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.05)' : '#fafafa' }}>
                                                                   <TableCell sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Açıklama</TableCell>
@@ -543,8 +543,8 @@ const StatementEditorPage: React.FC = () => {
                                                       ÖDENMEYEN / REVİZE GİDERLER
                                                 </Typography>
                                           </Box>
-                                          <TableContainer>
-                                                <Table size="small">
+                                          <TableContainer sx={{ overflowX: 'auto' }}>
+                                                <Table size="small" sx={{ minWidth: 500 }}>
                                                       <TableHead>
                                                             <TableRow sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.05)' : '#fafafa' }}>
                                                                   <TableCell sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Açıklama</TableCell>

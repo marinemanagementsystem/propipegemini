@@ -14,6 +14,8 @@ import {
       Box,
       Typography,
       IconButton,
+      useMediaQuery,
+      useTheme,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -95,14 +97,18 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
             onSubmit(formData);
       };
 
+      const theme = useTheme();
+      const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
       return (
             <Dialog
                   open={open}
                   onClose={onClose}
                   maxWidth="sm"
                   fullWidth
+                  fullScreen={fullScreen}
                   PaperProps={{
-                        sx: { borderRadius: 3 }
+                        sx: { borderRadius: fullScreen ? 0 : 3 }
                   }}
             >
                   <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>

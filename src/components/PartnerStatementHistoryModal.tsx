@@ -17,6 +17,8 @@ import {
   Chip,
   CircularProgress,
   IconButton,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import type { PartnerStatementHistoryEntry } from '../types/Partner';
@@ -107,8 +109,11 @@ const PartnerStatementHistoryModal: React.FC<PartnerStatementHistoryModalProps> 
     }).format(value);
   };
 
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth fullScreen={fullScreen}>
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h6">
           Değişiklik Geçmişi - {MONTH_NAMES[month - 1]} {year}
@@ -127,8 +132,8 @@ const PartnerStatementHistoryModal: React.FC<PartnerStatementHistoryModalProps> 
             Henüz değişiklik kaydı bulunmuyor.
           </Typography>
         ) : (
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
+          <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
+            <Table size="small" sx={{ minWidth: 800 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: 'action.hover' }}>
                   <TableCell sx={{ fontWeight: 'bold' }}>Tarih</TableCell>

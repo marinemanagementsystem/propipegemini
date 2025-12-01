@@ -197,7 +197,7 @@ const PartnerDetailPage: React.FC = () => {
   const balanceInfo = getBalanceDescription(partner.currentBalance);
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {/* Geri Butonu ve Başlık */}
       <Box display="flex" alignItems="center" gap={2} mb={3}>
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/partners')}>
@@ -276,7 +276,7 @@ const PartnerDetailPage: React.FC = () => {
       <Divider sx={{ mb: 3 }} />
 
       {/* Aylık Hesap Tablosu Başlığı */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
         <Typography variant="h5" fontWeight="bold">
           Aylık Hesap Dönemleri
         </Typography>
@@ -293,8 +293,8 @@ const PartnerDetailPage: React.FC = () => {
       </Box>
 
       {/* Statement Tablosu */}
-      <TableContainer component={Paper} elevation={2}>
-        <Table size="small">
+      <TableContainer component={Paper} elevation={2} sx={{ overflowX: 'auto' }}>
+        <Table size="small" sx={{ minWidth: 900 }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: 'primary.main' }}>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Dönem</TableCell>

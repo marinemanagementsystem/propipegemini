@@ -138,13 +138,13 @@ const PartnersPage: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {/* Başlık ve Butonlar */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
         <Typography variant="h4" fontWeight="bold">
           Ortaklar
         </Typography>
-        <Box display="flex" gap={2}>
+        <Box display="flex" gap={1} flexWrap="wrap">
           {/* Örnek veri yükle butonu - sadece veri yoksa göster */}
           {partners.length === 0 && (
             <Button
@@ -185,8 +185,8 @@ const PartnersPage: React.FC = () => {
       )}
 
       {/* Ortak Tablosu */}
-      <TableContainer component={Paper} elevation={2}>
-        <Table>
+      <TableContainer component={Paper} elevation={2} sx={{ overflowX: 'auto' }}>
+        <Table sx={{ minWidth: 650 }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: 'primary.main' }}>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Ortak Adı</TableCell>

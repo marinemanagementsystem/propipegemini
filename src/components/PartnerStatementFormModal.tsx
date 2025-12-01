@@ -13,6 +13,8 @@ import {
   Typography,
   Divider,
   Paper,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import type { PartnerStatement, PartnerStatementFormData } from '../types/Partner';
 import { MONTH_NAMES, calculateNextMonthBalance } from '../types/Partner';
@@ -223,8 +225,11 @@ const PartnerStatementFormModal: React.FC<PartnerStatementFormModalProps> = ({
   // Yıl seçenekleri
   const yearOptions = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
 
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
       <DialogTitle>
         {isEditing ? 'Dönem Satırını Düzenle' : 'Yeni Dönem Satırı Ekle'}
       </DialogTitle>

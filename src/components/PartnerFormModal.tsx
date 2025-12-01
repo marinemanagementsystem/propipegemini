@@ -9,6 +9,8 @@ import {
   Box,
   InputAdornment,
   Alert,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import type { Partner, PartnerFormData } from '../types/Partner';
 import { createPartner, updatePartner } from '../services/partners';
@@ -108,8 +110,11 @@ const PartnerFormModal: React.FC<PartnerFormModalProps> = ({
     }
   };
 
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
       <DialogTitle>
         {isEditing ? 'Ortak Düzenle' : 'Yeni Ortak Ekle'}
       </DialogTitle>
