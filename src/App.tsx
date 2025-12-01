@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { CssBaseline, AppBar, Toolbar, Typography, Button, Box, Container, IconButton, Avatar, Tooltip, alpha, Chip, useMediaQuery, Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import DashboardPage from './pages/DashboardPage';
 import ExpensesPage from './pages/ExpensesPage';
 import LoginPage from './pages/LoginPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -14,6 +15,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { ThemeProvider, useThemeContext } from './context/ThemeContext';
 import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import BusinessIcon from '@mui/icons-material/Business';
 import HandshakeIcon from '@mui/icons-material/Handshake';
@@ -32,13 +34,19 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
     { path: '/expenses', label: 'Giderler', icon: <ReceiptLongIcon /> },
     { path: '/projects', label: 'Tersaneler', icon: <BusinessIcon /> },
     { path: '/network', label: 'Network', icon: <HandshakeIcon /> },
     { path: '/partners', label: 'Ortaklar', icon: <PeopleIcon /> },
   ];
 
-  const isActive = (path: string) => location.pathname.startsWith(path);
+  const isActive = (path: string) => {
+    if (path === '/dashboard') {
+      return location.pathname === '/dashboard' || location.pathname === '/';
+    }
+    return location.pathname.startsWith(path);
+  };
 
   const NavButton = ({ item }: { item: typeof navItems[0] }) => (
     <Button
@@ -396,6 +404,17 @@ function App() {
 
             {/* Protected Routes Wrapped in Layout */}
             <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <DashboardPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/expenses"
               element={
                 <ProtectedRoute>
@@ -472,7 +491,7 @@ function App() {
               }
             />
 
-            <Route path="/" element={<Navigate to="/expenses" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Router>
       </AuthProvider>

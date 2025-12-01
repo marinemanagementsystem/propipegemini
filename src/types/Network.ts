@@ -33,6 +33,10 @@ export interface NetworkContact {
       quoteDate?: Timestamp;             // Teklif Tarihi
       result?: ResultStatus;             // Sonuç
       
+      // CRM Tarih Takibi (Dashboard için)
+      lastContactDate?: Timestamp;       // Son görüşme tarihi
+      nextActionDate?: Timestamp;        // Sonraki aksiyon tarihi
+      
       // Notlar
       notes?: string;
       
@@ -93,6 +97,8 @@ export interface NetworkContactFormData {
       quoteStatus: QuoteStatus;
       quoteDate?: Date;
       result?: ResultStatus;
+      lastContactDate?: Date;
+      nextActionDate?: Date;
       notes?: string;
 }
 
