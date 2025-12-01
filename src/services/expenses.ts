@@ -70,32 +70,8 @@ export const getExpenses = async (
       showDeleted: boolean = false
 ): Promise<Expense[]> => {
       try {
-            // NOT: Firestore'da "isDeleted" ve "date" alanları için composite index oluşturulması gerekir.
-            // Kullanıcı bu index'i oluşturana kadar hatayı önlemek için filtrelemeyi client-side yapıyoruz.
-            // Bu nedenle sorgudan "where('isDeleted', ...)" kısmını kaldırıyoruz.
-
-            let q = query(collection(db, EXPENSES_COLLECTION), orderBy("date", "desc"));
-
-            // Tarih Filtresi
-            if (startDate) {
-                  q = query(q, where("date", ">=", Timestamp.fromDate(startDate)));
-            }
-            if (endDate) {
-                  // Bitiş tarihinin gün sonunu al
-                  const end = new Date(endDate);
-                  end.setHours(23, 59, 59, 999);
-                  q = query(q, where("date", "<=", Timestamp.fromDate(end)));
-            }
-
-            // Tür Filtresi
-            if (type && type !== 'ALL') {
-                  q = query(q, where("type", "==", type));
-            }
-
-            // Durum Filtresi
-            if (status && status !== 'ALL') {
-                  q = query(q, where("status", "==", status));
-            }
+            // Firestore composite index sorunlarını önlemek için tüm verileri çekip client-side filtreleme yapıyoruz
+            const q = query(collection(db, EXPENSES_COLLECTION), orderBy("date", "desc"));
 
             const querySnapshot = await getDocs(q);
             let expenses = querySnapshot.docs.map((doc) => ({
@@ -108,6 +84,34 @@ export const getExpenses = async (
                   expenses = expenses.filter(e => e.isDeleted === true);
             } else {
                   expenses = expenses.filter(e => !e.isDeleted);
+            }
+
+            // Client-side tarih filtresi
+            if (startDate) {
+                  const start = new Date(startDate);
+                  start.setHours(0, 0, 0, 0);
+                  expenses = expenses.filter(e => {
+                        const expenseDate = e.date.toDate();
+                        return expenseDate >= start;
+                  });
+            }
+            if (endDate) {
+                  const end = new Date(endDate);
+                  end.setHours(23, 59, 59, 999);
+                  expenses = expenses.filter(e => {
+                        const expenseDate = e.date.toDate();
+                        return expenseDate <= end;
+                  });
+            }
+
+            // Client-side tür filtresi
+            if (type && type !== 'ALL') {
+                  expenses = expenses.filter(e => e.type === type);
+            }
+
+            // Client-side durum filtresi
+            if (status && status !== 'ALL') {
+                  expenses = expenses.filter(e => e.status === status);
             }
 
             return expenses;

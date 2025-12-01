@@ -342,23 +342,25 @@ const ExpensesPage: React.FC = () => {
                                                       <ViewModuleIcon sx={{ mr: 0.5 }} fontSize="small" /> Kartlar
                                                 </ToggleButton>
                                           </ToggleButtonGroup>
-                                          <Tooltip title="Örnek veri yükle">
-                                                <Button
-                                                      variant="outlined"
-                                                      startIcon={<CloudUploadIcon />}
-                                                      onClick={handleImportData}
-                                                      sx={{ 
-                                                            borderColor: alpha(theme.palette.divider, 0.3),
-                                                            color: 'text.secondary',
-                                                            '&:hover': {
-                                                                  borderColor: theme.palette.primary.main,
-                                                                  color: 'primary.main',
-                                                            },
-                                                      }}
-                                                >
-                                                      İçe Aktar
-                                                </Button>
-                                          </Tooltip>
+                                          {currentUserProfile?.role === 'ADMIN' && (
+                                                <Tooltip title="Örnek veri yükle">
+                                                      <Button
+                                                            variant="outlined"
+                                                            startIcon={<CloudUploadIcon />}
+                                                            onClick={handleImportData}
+                                                            sx={{ 
+                                                                  borderColor: alpha(theme.palette.divider, 0.3),
+                                                                  color: 'text.secondary',
+                                                                  '&:hover': {
+                                                                        borderColor: theme.palette.primary.main,
+                                                                        color: 'primary.main',
+                                                                  },
+                                                            }}
+                                                      >
+                                                            İçe Aktar
+                                                      </Button>
+                                                </Tooltip>
+                                          )}
                                           <Button
                                                 variant="contained"
                                                 startIcon={<AddIcon />}

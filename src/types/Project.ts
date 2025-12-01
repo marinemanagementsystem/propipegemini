@@ -1,5 +1,35 @@
 import { Timestamp } from "firebase/firestore";
 
+// History Entry for Project
+export interface ProjectHistoryEntry {
+      id: string;
+      projectId: string;
+      previousData: Project;
+      changedAt: Timestamp;
+      changedByUserId: string;
+      changedByEmail?: string;
+      changedByDisplayName?: string;
+      changeType: "UPDATE" | "DELETE" | "REVERT";
+}
+
+// History Entry for Statement (includes line operations)
+export interface StatementHistoryEntry {
+      id: string;
+      statementId: string;
+      previousData?: ProjectStatement | StatementLine;
+      newData?: StatementLine;
+      changedAt: Timestamp;
+      changedByUserId: string;
+      changedByEmail?: string;
+      changedByDisplayName?: string;
+      changeType: "UPDATE" | "DELETE" | "REVERT" | "STATUS_CHANGE" | "LINE_ADD" | "LINE_UPDATE" | "LINE_DELETE" | "CLOSE";
+      // Extra fields for line operations
+      lineId?: string;
+      lineDescription?: string;
+      lineAmount?: number;
+      lineDirection?: "INCOME" | "EXPENSE";
+}
+
 // 1.A) Collection: projects (Shipyards)
 export interface Project {
       id: string;

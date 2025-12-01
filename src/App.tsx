@@ -6,6 +6,9 @@ import LoginPage from './pages/LoginPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import StatementEditorPage from './pages/StatementEditorPage';
+import NetworkPage from './pages/NetworkPage';
+import PartnersPage from './pages/PartnersPage';
+import PartnerDetailPage from './pages/PartnerDetailPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ThemeProvider, useThemeContext } from './context/ThemeContext';
@@ -13,6 +16,8 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import BusinessIcon from '@mui/icons-material/Business';
+import HandshakeIcon from '@mui/icons-material/Handshake';
+import PeopleIcon from '@mui/icons-material/People';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useState } from 'react';
@@ -29,6 +34,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const navItems = [
     { path: '/expenses', label: 'Giderler', icon: <ReceiptLongIcon /> },
     { path: '/projects', label: 'Tersaneler', icon: <BusinessIcon /> },
+    { path: '/network', label: 'Network', icon: <HandshakeIcon /> },
+    { path: '/partners', label: 'Ortaklar', icon: <PeopleIcon /> },
   ];
 
   const isActive = (path: string) => location.pathname.startsWith(path);
@@ -103,7 +110,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               <Box
                 component="img"
                 src="/logo.jpg"
-                alt="PROPIPE Logo"
+                alt="PRO PIPE|STEEL Logo"
                 sx={{
                   width: 52,
                   height: 52,
@@ -119,30 +126,70 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 }}
               />
               <Box>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontWeight: 800, 
-                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    letterSpacing: '-0.02em',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  PROPIPE
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'baseline' }}>
+                  <Typography 
+                    component="span"
+                    sx={{ 
+                      fontSize: '1.1rem',
+                      fontWeight: 300, 
+                      background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      letterSpacing: '0.08em',
+                    }}
+                  >
+                    PRO{' '}
+                  </Typography>
+                  <Typography 
+                    component="span"
+                    sx={{ 
+                      fontSize: '1.1rem',
+                      fontWeight: 700, 
+                      background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}
+                  >
+                    PIPE
+                  </Typography>
+                  <Typography 
+                    component="span"
+                    sx={{ 
+                      fontSize: '1.1rem',
+                      fontWeight: 300, 
+                      color: alpha(theme.palette.text.primary, 0.4),
+                      mx: 0.3,
+                    }}
+                  >
+                    |
+                  </Typography>
+                  <Typography 
+                    component="span"
+                    sx={{ 
+                      fontSize: '1.1rem',
+                      fontWeight: 700, 
+                      background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}
+                  >
+                    STEEL
+                  </Typography>
+                </Box>
                 <Typography 
                   variant="caption" 
                   sx={{ 
                     color: 'text.secondary',
-                    fontSize: '0.65rem',
-                    letterSpacing: '0.1em',
+                    fontSize: '0.6rem',
+                    letterSpacing: '0.25em',
                     textTransform: 'uppercase',
+                    display: 'block',
                   }}
                 >
-                  Marine Management
+                  SOLUTION
                 </Typography>
               </Box>
             </Box>
@@ -387,6 +434,39 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <StatementEditorPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/network"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <NetworkPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/partners"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <PartnersPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/partners/:partnerId"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <PartnerDetailPage />
                   </Layout>
                 </ProtectedRoute>
               }

@@ -11,14 +11,96 @@ import {
       Timestamp,
       serverTimestamp,
       getDoc,
-      writeBatch
+      writeBatch,
+      limit,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import type { Project, ProjectStatement, StatementLine } from "../types/Project";
+import type { Project, ProjectStatement, StatementLine, ProjectHistoryEntry, StatementHistoryEntry } from "../types/Project";
 
 const PROJECTS_COLLECTION = "projects";
 const STATEMENTS_COLLECTION = "project_statements";
 const LINES_SUBCOLLECTION = "statement_lines";
+
+// --- History Helpers ---
+
+export const addProjectHistoryEntry = async (
+      projectId: string,
+      previousData: Project,
+      user: { uid: string; email?: string | null; displayName?: string | null },
+      changeType: "UPDATE" | "DELETE" | "REVERT"
+): Promise<void> => {
+      try {
+            const historyRef = collection(db, PROJECTS_COLLECTION, projectId, "history");
+            await addDoc(historyRef, {
+                  projectId,
+                  previousData,
+                  changedAt: Timestamp.now(),
+                  changedByUserId: user.uid,
+                  changedByEmail: user.email || null,
+                  changedByDisplayName: user.displayName || null,
+                  changeType
+            });
+      } catch (error) {
+            console.error("Error adding project history entry:", error);
+      }
+};
+
+export const getProjectHistory = async (projectId: string): Promise<ProjectHistoryEntry[]> => {
+      try {
+            const historyRef = collection(db, PROJECTS_COLLECTION, projectId, "history");
+            const q = query(historyRef, orderBy("changedAt", "desc"), limit(10));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProjectHistoryEntry));
+      } catch (error) {
+            console.error("Error fetching project history:", error);
+            return [];
+      }
+};
+
+export const addStatementHistoryEntry = async (
+      statementId: string,
+      previousData: ProjectStatement | StatementLine | null,
+      user: { uid: string; email?: string | null; displayName?: string | null },
+      changeType: "UPDATE" | "DELETE" | "REVERT" | "STATUS_CHANGE" | "LINE_ADD" | "LINE_UPDATE" | "LINE_DELETE" | "CLOSE",
+      lineInfo?: { lineId?: string; description?: string; amount?: number; direction?: "INCOME" | "EXPENSE"; newData?: StatementLine }
+): Promise<void> => {
+      try {
+            const historyRef = collection(db, STATEMENTS_COLLECTION, statementId, "history");
+            
+            // Build history entry data, filtering out undefined values
+            const historyData: Record<string, unknown> = {
+                  statementId,
+                  changedAt: Timestamp.now(),
+                  changedByUserId: user.uid,
+                  changeType
+            };
+            
+            if (previousData) historyData.previousData = previousData;
+            if (user.email) historyData.changedByEmail = user.email;
+            if (user.displayName) historyData.changedByDisplayName = user.displayName;
+            if (lineInfo?.lineId) historyData.lineId = lineInfo.lineId;
+            if (lineInfo?.description) historyData.lineDescription = lineInfo.description;
+            if (lineInfo?.amount !== undefined) historyData.lineAmount = lineInfo.amount;
+            if (lineInfo?.direction) historyData.lineDirection = lineInfo.direction;
+            if (lineInfo?.newData) historyData.newData = lineInfo.newData;
+            
+            await addDoc(historyRef, historyData);
+      } catch (error) {
+            console.error("Error adding statement history entry:", error);
+      }
+};
+
+export const getStatementHistory = async (statementId: string): Promise<StatementHistoryEntry[]> => {
+      try {
+            const historyRef = collection(db, STATEMENTS_COLLECTION, statementId, "history");
+            const q = query(historyRef, orderBy("changedAt", "desc"), limit(50));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StatementHistoryEntry));
+      } catch (error) {
+            console.error("Error fetching statement history:", error);
+            return [];
+      }
+};
 
 // --- Project (Shipyard) Methods ---
 
@@ -208,6 +290,16 @@ export const createStatementLine = async (
             };
             const docRef = await addDoc(collection(db, STATEMENTS_COLLECTION, statementId, LINES_SUBCOLLECTION), lineData);
 
+            // Add history entry for line creation
+            if (user) {
+                  await addStatementHistoryEntry(statementId, null, user, "LINE_ADD", {
+                        lineId: docRef.id,
+                        description: data.description,
+                        amount: data.amount,
+                        direction: data.direction
+                  });
+            }
+
             // Recalculate totals
             await recalculateStatementTotals(statementId, user);
 
@@ -226,10 +318,25 @@ export const updateStatementLine = async (
 ): Promise<void> => {
       try {
             const docRef = doc(db, STATEMENTS_COLLECTION, statementId, LINES_SUBCOLLECTION, lineId);
+            
+            // Get previous data for history
+            const previousDoc = await getDoc(docRef);
+            const previousData = previousDoc.exists() ? { id: previousDoc.id, ...previousDoc.data() } as StatementLine : null;
+            
             await updateDoc(docRef, {
                   ...updates,
                   updatedAt: serverTimestamp()
             });
+
+            // Add history entry for line update
+            if (user && previousData) {
+                  await addStatementHistoryEntry(statementId, previousData, user, "LINE_UPDATE", {
+                        lineId,
+                        description: updates.description || previousData.description,
+                        amount: updates.amount !== undefined ? updates.amount : previousData.amount,
+                        direction: updates.direction || previousData.direction
+                  });
+            }
 
             // Recalculate totals
             await recalculateStatementTotals(statementId, user);
@@ -246,7 +353,22 @@ export const deleteStatementLine = async (
 ): Promise<void> => {
       try {
             const docRef = doc(db, STATEMENTS_COLLECTION, statementId, LINES_SUBCOLLECTION, lineId);
+            
+            // Get previous data for history
+            const previousDoc = await getDoc(docRef);
+            const previousData = previousDoc.exists() ? { id: previousDoc.id, ...previousDoc.data() } as StatementLine : null;
+            
             await deleteDoc(docRef);
+
+            // Add history entry for line deletion
+            if (user && previousData) {
+                  await addStatementHistoryEntry(statementId, previousData, user, "LINE_DELETE", {
+                        lineId,
+                        description: previousData.description,
+                        amount: previousData.amount,
+                        direction: previousData.direction
+                  });
+            }
 
             // Recalculate totals
             await recalculateStatementTotals(statementId, user);
@@ -312,7 +434,8 @@ export const recalculateStatementTotals = async (
 export const closeStatement = async (
       statementId: string,
       projectId: string,
-      action: "TRANSFERRED_TO_SAFE" | "CARRIED_OVER"
+      action: "TRANSFERRED_TO_SAFE" | "CARRIED_OVER",
+      user?: { uid: string; email?: string; displayName?: string }
 ): Promise<void> => {
       try {
             const statement = await getStatementById(statementId);
@@ -346,6 +469,11 @@ export const closeStatement = async (
             });
 
             await batch.commit();
+
+            // Add history entry for closing
+            if (user) {
+                  await addStatementHistoryEntry(statementId, statement, user, "CLOSE");
+            }
 
       } catch (error) {
             console.error("Error closing statement:", error);

@@ -19,6 +19,8 @@ import {
       Chip,
       Paper,
       InputAdornment,
+      IconButton,
+      Tooltip,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
@@ -29,10 +31,12 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SearchIcon from '@mui/icons-material/Search';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AnchorIcon from '@mui/icons-material/Anchor';
+import HistoryIcon from '@mui/icons-material/History';
 import { useNavigate } from 'react-router-dom';
-import { getProjects, createProject } from '../services/projects';
-import type { Project } from '../types/Project';
+import { getProjects, createProject, getProjectHistory } from '../services/projects';
+import type { Project, ProjectHistoryEntry } from '../types/Project';
 import { useAuth } from '../context/AuthContext';
+import HistoryModal from '../components/HistoryModal';
 
 const ProjectsPage: React.FC = () => {
       const navigate = useNavigate();
@@ -44,6 +48,12 @@ const ProjectsPage: React.FC = () => {
       const [formData, setFormData] = useState({ name: '', location: '' });
       const [submitting, setSubmitting] = useState(false);
       const [searchQuery, setSearchQuery] = useState('');
+
+      // History Modal State
+      const [historyModalOpen, setHistoryModalOpen] = useState(false);
+      const [historyLoading, setHistoryLoading] = useState(false);
+      const [historyData, setHistoryData] = useState<ProjectHistoryEntry[]>([]);
+      const [selectedProjectName, setSelectedProjectName] = useState<string>('');
 
       const isDark = theme.palette.mode === 'dark';
 
@@ -82,6 +92,21 @@ const ProjectsPage: React.FC = () => {
                   alert("Tersane oluşturulurken bir hata oluştu.");
             } finally {
                   setSubmitting(false);
+            }
+      };
+
+      const handleHistory = async (project: Project) => {
+            setSelectedProjectName(project.name);
+            setHistoryLoading(true);
+            setHistoryModalOpen(true);
+            try {
+                  const history = await getProjectHistory(project.id);
+                  setHistoryData(history);
+            } catch (error) {
+                  console.error("Error fetching history:", error);
+                  setHistoryData([]);
+            } finally {
+                  setHistoryLoading(false);
             }
       };
 
@@ -400,6 +425,19 @@ const ProjectsPage: React.FC = () => {
                                                             </Box>
                                                       </CardContent>
                                                       <CardActions sx={{ p: 2.5, pt: 0 }}>
+                                                            <Tooltip title="Geçmiş">
+                                                                  <IconButton
+                                                                        size="small"
+                                                                        onClick={(e) => { e.stopPropagation(); handleHistory(project); }}
+                                                                        sx={{ 
+                                                                              color: 'info.main',
+                                                                              mr: 1,
+                                                                              '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.1) }
+                                                                        }}
+                                                                  >
+                                                                        <HistoryIcon fontSize="small" />
+                                                                  </IconButton>
+                                                            </Tooltip>
                                                             <Button
                                                                   fullWidth
                                                                   variant="outlined"
@@ -472,6 +510,15 @@ const ProjectsPage: React.FC = () => {
                               </Button>
                         </DialogActions>
                   </Dialog>
+
+                  {/* History Modal */}
+                  <HistoryModal
+                        open={historyModalOpen}
+                        onClose={() => setHistoryModalOpen(false)}
+                        title={`${selectedProjectName} - Değişiklik Geçmişi`}
+                        history={historyData}
+                        loading={historyLoading}
+                  />
             </Box>
       );
 };

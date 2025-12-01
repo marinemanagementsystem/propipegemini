@@ -27,13 +27,16 @@ import {
       InputLabel,
       Chip,
       Alert,
-      useTheme
+      useTheme,
+      Tooltip,
+      alpha
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
+import HistoryIcon from '@mui/icons-material/History';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
       getProjectById,
@@ -44,10 +47,12 @@ import {
       deleteStatementLine,
       updateStatement,
       closeStatement,
-      getStatementsByProject
+      getStatementsByProject,
+      getStatementHistory
 } from '../services/projects';
-import type { Project, ProjectStatement, StatementLine } from '../types/Project';
+import type { Project, ProjectStatement, StatementLine, StatementHistoryEntry } from '../types/Project';
 import { useAuth } from '../context/AuthContext';
+import HistoryModal from '../components/HistoryModal';
 
 const StatementEditorPage: React.FC = () => {
       const { projectId, statementId } = useParams<{ projectId: string; statementId: string }>();
@@ -79,6 +84,11 @@ const StatementEditorPage: React.FC = () => {
       // Edit Previous Balance State
       const [openBalanceModal, setOpenBalanceModal] = useState(false);
       const [tempBalance, setTempBalance] = useState<string>('');
+
+      // History Modal State
+      const [historyModalOpen, setHistoryModalOpen] = useState(false);
+      const [historyLoading, setHistoryLoading] = useState(false);
+      const [historyData, setHistoryData] = useState<StatementHistoryEntry[]>([]);
 
       useEffect(() => {
             if (projectId && statementId) {
@@ -124,6 +134,21 @@ const StatementEditorPage: React.FC = () => {
             } catch (error) {
                   console.error("Error updating balance:", error);
                   alert("Bakiye güncellenemedi.");
+            }
+      };
+
+      const handleHistory = async () => {
+            if (!statementId) return;
+            setHistoryLoading(true);
+            setHistoryModalOpen(true);
+            try {
+                  const history = await getStatementHistory(statementId);
+                  setHistoryData(history);
+            } catch (error) {
+                  console.error("Error fetching history:", error);
+                  setHistoryData([]);
+            } finally {
+                  setHistoryLoading(false);
             }
       };
 
@@ -205,7 +230,12 @@ const StatementEditorPage: React.FC = () => {
       const handleCloseStatement = async (action: "TRANSFERRED_TO_SAFE" | "CARRIED_OVER") => {
             if (!statementId || !projectId) return;
             try {
-                  await closeStatement(statementId, projectId, action);
+                  const user = currentUserAuth ? {
+                        uid: currentUserAuth.uid,
+                        email: currentUserAuth.email || undefined,
+                        displayName: currentUserProfile?.displayName || undefined
+                  } : undefined;
+                  await closeStatement(statementId, projectId, action, user);
                   setOpenCloseModal(false);
                   if (projectId) fetchData(projectId, statementId);
             } catch (error) {
@@ -267,25 +297,38 @@ const StatementEditorPage: React.FC = () => {
       return (
             <Container maxWidth="xl" sx={{ py: 4 }}>
                   {/* Top Bar */}
-                  <Box mb={3} display="flex" alignItems="center">
-                        <Button
-                              startIcon={<ArrowBackIcon />}
-                              onClick={() => navigate(`/projects/${projectId}`)}
-                              sx={{ mr: 2, textTransform: 'none' }}
-                        >
-                              Geri
-                        </Button>
-                        <Box>
-                              <Typography variant="h5" fontWeight="bold">
-                                    {project.name} - {statement.title}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                    {new Date(statement.date.toDate()).toLocaleDateString('tr-TR')} | Durum:
-                                    <Box component="span" fontWeight="bold" color={isClosed ? 'success.main' : 'warning.main'} ml={0.5}>
-                                          {isClosed ? 'KAPALI' : 'TASLAK'}
-                                    </Box>
-                              </Typography>
+                  <Box mb={3} display="flex" alignItems="center" justifyContent="space-between">
+                        <Box display="flex" alignItems="center">
+                              <Button
+                                    startIcon={<ArrowBackIcon />}
+                                    onClick={() => navigate(`/projects/${projectId}`)}
+                                    sx={{ mr: 2, textTransform: 'none' }}
+                              >
+                                    Geri
+                              </Button>
+                              <Box>
+                                    <Typography variant="h5" fontWeight="bold">
+                                          {project.name} - {statement.title}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                          {new Date(statement.date.toDate()).toLocaleDateString('tr-TR')} | Durum:
+                                          <Box component="span" fontWeight="bold" color={isClosed ? 'success.main' : 'warning.main'} ml={0.5}>
+                                                {isClosed ? 'KAPALI' : 'TASLAK'}
+                                          </Box>
+                                    </Typography>
+                              </Box>
                         </Box>
+                        <Tooltip title="Değişiklik Geçmişi">
+                              <IconButton 
+                                    onClick={handleHistory}
+                                    sx={{ 
+                                          color: 'info.main',
+                                          '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.1) }
+                                    }}
+                              >
+                                    <HistoryIcon />
+                              </IconButton>
+                        </Tooltip>
                   </Box>
 
                   {/* Summary Cards */}
@@ -697,6 +740,15 @@ const StatementEditorPage: React.FC = () => {
                               </Button>
                         </DialogActions>
                   </Dialog>
+
+                  {/* History Modal */}
+                  <HistoryModal
+                        open={historyModalOpen}
+                        onClose={() => setHistoryModalOpen(false)}
+                        title={`${statement?.title || 'Hakediş'} - Değişiklik Geçmişi`}
+                        history={historyData}
+                        loading={historyLoading}
+                  />
             </Container>
       );
 };
